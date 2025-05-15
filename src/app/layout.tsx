@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
 import "../styles/globals.css";
+import type { Metadata } from "next";
+import QueryProvider from "@/providers/query-provider";
 
 export const metadata: Metadata = {
   title: "Warehouse Management System",
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`antialiased`}>{children}</body>
+      <body className={`antialiased`}>
+        <QueryProvider>{children}</QueryProvider>
+      </body>
     </html>
   );
 }
