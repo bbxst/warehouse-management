@@ -9,6 +9,7 @@ namespace backend.ViewModels
         public decimal Price { get; set; }
         public decimal Quantity { get; set; }
         public decimal Total { get; set; }
+        public ItemStatus Status { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
@@ -21,6 +22,7 @@ namespace backend.ViewModels
                 Price = item.Price,
                 Quantity = item.Quantity,
                 Total = item.Price * item.Quantity,
+                Status = item.Status,
                 CreatedAt = item.CreatedAt,
                 UpdatedAt = item.UpdatedAt
             };
