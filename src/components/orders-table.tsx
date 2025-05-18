@@ -32,7 +32,7 @@ export function OrdersTable() {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto md:border md:rounded-md md:p-6">
+    <div className="flex-1 flex flex-col gap-3 overflow-hidden md:border md:rounded-md md:p-6">
       <Table>
         <TableHeader>
           <TableRow className="[&>th]:font-bold text-mute-foreground">
@@ -55,10 +55,25 @@ export function OrdersTable() {
                 </div>
               </TableCell>
             </TableRow>
+          ) : !data || data.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={8}>
+                <div className="flex items-center justify-center py-4 text-muted-foreground font-medium">
+                  No data available
+                </div>
+              </TableCell>
+            </TableRow>
           ) : (
-            data?.map((order) => (
+            data.map((order) => (
               <TableRow key={order.id}>
-                <TableCell>{order.id}</TableCell>
+                <TableCell>
+                  <Link
+                    href={`/orders/${order.id}`}
+                    className="font-medium text-blue-500 hover:text-blue-600 hover:underline"
+                  >
+                    {order.id}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   {new Date(order.createdAt).toLocaleDateString()}
                 </TableCell>
