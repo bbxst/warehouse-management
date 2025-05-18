@@ -29,7 +29,7 @@ namespace backend.Services
             return await query.ToListAsync();
         }
 
-        public async Task<Order?> GetOrder(string id)
+        public async Task<OrderDetail?> GetOrder(string id)
         {
             try
             {
@@ -39,8 +39,28 @@ namespace backend.Services
                     .FirstOrDefaultAsync(o => o.Id == id) ??
                     throw new KeyNotFoundException($"Order with ID {id} not found.");
 
+                var total = order.OrderItems.Sum(item => item.Item!.Price * item.Quantity);
+
+                var orderViewModel = new OrderDetail
+                {
+                    Id = order.Id,
+                    Type = order.Type,
+                    Status = order.Status,
+                    Total = total,
+                    CreatedAt = order.CreatedAt,
+                    UpdatedAt = order.UpdatedAt,
+                    Items = [.. order.OrderItems.Select(item => new OrderItemDetail
+                    {
+                        Id = item.ItemId,
+                        Name = item.Item!.Name,
+                        Price = item.Item.Price,
+                        Quantity = item.Quantity,
+
+                    })]
+                };
+
                 logger.LogInformation("Fetched details for order {OrderId}", order.Id);
-                return order;
+                return orderViewModel;
             }
             catch (Exception ex)
             {
@@ -148,6 +168,12 @@ namespace backend.Services
                     context.OrderItems.Update(existingItem);
                 }
 
+                var order = await context.Orders.FindAsync(updateDto.OrderId);
+                if (order != null)
+                { 
+                    order.UpdatedAt = DateTime.UtcNow;
+                }
+
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -175,6 +201,7 @@ namespace backend.Services
                     throw new ArgumentException($"Order {orderStatus.Id} not found.");
 
                 existingOrder.Status = orderStatus.Status;
+                existingOrder.UpdatedAt = DateTime.UtcNow;
                 await context.SaveChangesAsync();
 
                 logger.LogInformation("Update order status for Id: {OrderId} successfully", orderStatus.Id);
@@ -200,6 +227,7 @@ namespace backend.Services
                     throw new ArgumentException($"Order {id} not found.");
 
                 existingOrder.Status = OrderStatus.Canceled;
+                existingOrder.UpdatedAt = DateTime.UtcNow;
                 await context.SaveChangesAsync();
 
                 logger.LogInformation("Cancel order Id: {OrderId} successfully", id);
