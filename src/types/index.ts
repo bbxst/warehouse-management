@@ -3,8 +3,11 @@ import { OrderStatus, OrderType } from "./enums";
 export interface Item {
   id: string;
   name: string;
-  quantity: number;
   price: number;
+  quantity: number;
+  total: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Order {
