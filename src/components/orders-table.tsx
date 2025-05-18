@@ -1,5 +1,17 @@
 "use client";
 
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { ExternalLink, Loader2 } from "lucide-react";
+
+import {
+  apiRequest,
+  getOrderStatusLabel,
+  getOrderTypeLabel,
+} from "@/lib/utils";
+import { Order } from "@/types";
+import { OrderStatus } from "@/types/enums";
+
 import {
   Table,
   TableBody,
@@ -7,19 +19,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import {
-  apiRequest,
-  getOrderStatusLabel,
-  getOrderTypeLabel,
-} from "@/lib/utils";
-import { Order } from "@/types";
-import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { buttonVariants } from "./ui/button";
+} from "./ui/table";
 import { Badge } from "./ui/badge";
-import { OrderStatus } from "@/types/enums";
+import { buttonVariants } from "./ui/button";
 
 export function OrdersTable() {
   const { data, isLoading } = useQuery<Order[]>({
@@ -30,12 +32,13 @@ export function OrdersTable() {
   });
 
   return (
-    <div>
+    <div className="flex-1 overflow-y-auto md:border md:rounded-md md:p-6">
       <Table>
         <TableHeader>
           <TableRow className="[&>th]:font-bold text-mute-foreground">
             <TableHead>Id</TableHead>
-            <TableHead>Date</TableHead>
+            <TableHead>Issued on</TableHead>
+            <TableHead>Last update</TableHead>
             <TableHead>Items</TableHead>
             <TableHead>Total</TableHead>
             <TableHead>Type</TableHead>
@@ -59,8 +62,11 @@ export function OrdersTable() {
                 <TableCell>
                   {new Date(order.createdAt).toLocaleDateString()}
                 </TableCell>
-                <TableCell>{order.items?.length}</TableCell>
-                <TableCell>฿ 0</TableCell>
+                <TableCell>
+                  {new Date(order.updatedAt).toLocaleDateString()}
+                </TableCell>
+                <TableCell>{order.itemCount}</TableCell>
+                <TableCell>฿ {order.total.toLocaleString()}</TableCell>
                 <TableCell>
                   <Badge variant="outline">
                     {getOrderTypeLabel(order.type)}
