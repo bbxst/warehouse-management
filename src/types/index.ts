@@ -14,7 +14,8 @@ export interface Order {
   id: string;
   type: OrderType;
   status: OrderStatus;
-  items?: Item[];
+  itemCount: number;
+  total: number;
   createdAt: string;
   updatedAt: string;
 }
