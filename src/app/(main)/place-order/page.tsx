@@ -73,7 +73,10 @@ export default function PlaceOrderPage() {
   const { data } = useQuery<Item[]>({
     queryKey: ["inventory", search],
     queryFn: async () => {
-      return await apiRequest<Item[]>(`/api/inventory?name=${search}`, "GET");
+      return await apiRequest<Item[]>(
+        `/api/inventory?status=1&name=${search}`,
+        "GET"
+      );
     },
     enabled: search.length > 0,
   });
