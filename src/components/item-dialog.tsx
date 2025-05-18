@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Item } from "@/types";
-import { generateUniqueId } from "@/lib/utils";
 
 import {
   Dialog,
@@ -26,10 +25,11 @@ import {
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
-import SubmitButton from "./submit-button";
+import { SubmitButton } from "./submit-button";
+import { apiRequest } from "@/lib/utils";
+import { useSidebar } from "./ui/sidebar";
 
 const itemSchema = z.object({
-  id: z.string().nonempty({ message: "Id is required" }),
   name: z.string().nonempty({ message: "Name is required" }),
   price: z.coerce
     .number()
@@ -47,6 +47,7 @@ interface ItemDialogProps {
 export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
   const isEditing = !!item;
   const queryClient = useQueryClient();
+  const { openMobile, setOpenMobile } = useSidebar();
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemSchema),
@@ -54,7 +55,6 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
 
   useEffect(() => {
     form.reset({
-      id: "defalut",
       name: item?.name || "",
       price: item?.price || 0,
     });
@@ -63,36 +63,14 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
   const mutation = useMutation({
     mutationFn: async (values: ItemFormValues) => {
       if (isEditing) {
-        const response = await fetch(
-          `https://localhost:5001/api/inventory/${item?.id}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(values),
-          }
-        );
-        if (!response.ok) {
-          throw new Error("Failed to update item");
-        }
+        await apiRequest(`/api/inventory/${item?.id}`, "PATCH", values);
       } else {
-        const response = await fetch("https://localhost:5001/api/inventory", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(values),
-        });
-        if (!response.ok) {
-          throw new Error("Failed to create item");
-        }
+        await apiRequest(`/api/inventory`, "POST", values);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       toast.success(`Item ${isEditing ? "updated" : "created"} successfully`);
-      onOpenChange(false);
     },
     onError: (error) => {
       toast.error(`Error: ${error.message}`);
@@ -100,11 +78,12 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
     onSettled: () => {
       if (!isEditing) {
         form.reset({
-          id: generateUniqueId("INV"),
           name: "",
           price: 0,
         });
       }
+      onOpenChange(false);
+      if (openMobile) setOpenMobile(false);
     },
   });
 
