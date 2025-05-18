@@ -1,8 +1,6 @@
-using backend.Data;
-using backend.Interfaces;
 using backend.Models;
+using backend.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers
 {
@@ -13,9 +11,9 @@ namespace backend.Controllers
         private readonly IInventoryService inventoryService = inventoryService;
 
         [HttpGet]
-        public async Task<IActionResult> GetItems()
+        public async Task<IActionResult> GetItems([FromQuery] string? name)
         {
-            var items = await inventoryService.GetItems();
+            var items = await inventoryService.GetItems(name);
 
             if (items == null || !items.Any())
             {
@@ -74,7 +72,7 @@ namespace backend.Controllers
         {
             var deleted = await inventoryService.DeleteItem(id);
 
-            if (!deleted)
+            if (deleted == null)
             {
                 return NotFound($"Item with Id {id} not found");
             }
