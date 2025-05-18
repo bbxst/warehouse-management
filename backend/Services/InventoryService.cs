@@ -11,13 +11,18 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
     private readonly AppDbContext context = context;
     private readonly ILogger<InventoryService> logger = logger;
 
-    public async Task<IEnumerable<ItemViewModel>> GetItems(string? name = null)
+    public async Task<IEnumerable<ItemViewModel>> GetItems(string? name = null, ItemStatus? status = null)
     {
         var query = context.Inventory.AsQueryable();
 
         if (!string.IsNullOrEmpty(name))
         {
             query = query.Where(item => item.Name.ToLower().Contains(name.ToLower()));
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(item => item.Status == status.Value);
         }
 
         var items = await query
@@ -28,6 +33,7 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
                 Price = item.Price,
                 Quantity = item.Quantity,
                 Total = item.Quantity * item.Price,
+                Status = item.Status,
                 CreatedAt = item.CreatedAt,
                 UpdatedAt = item.UpdatedAt,
             })
@@ -119,7 +125,7 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
                 throw new KeyNotFoundException($"Delete failed: Item with ID {id} not found.");
             }
 
-            context.Inventory.Remove(existingItem);
+            existingItem.Status = ItemStatus.Deleted;
             var completed = await context.SaveChangesAsync() > 0;
 
             if (completed)
