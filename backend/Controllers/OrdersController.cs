@@ -55,9 +55,11 @@ namespace backend.Controllers
 
                 var result = await orderService.AddOrder(order);
 
-                if (result == null) return BadRequest("Failed to create order");
-
                 return CreatedAtAction(nameof(GetOrder), new { id = result }, order);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {

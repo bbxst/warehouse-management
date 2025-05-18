@@ -5,7 +5,7 @@ namespace backend.Interfaces
 {
     public interface IOrderService
     {
-        Task<IEnumerable<Order>> GetOrders(OrderStatus? status, OrderType? type);
+        Task<IEnumerable<OrderViewModel>> GetOrders(OrderStatus? status, OrderType? type);
         Task<OrderDetail?> GetOrder(string id);
         Task<string?> AddOrder(AddOrderDto order);
         Task<string> UpdateOrder(UpdateOrderStatus orderStatus);

@@ -11,9 +11,12 @@ namespace backend.Services
         private readonly AppDbContext context = context;
         private readonly ILogger<OrderService> logger = logger;
 
-        public async Task<IEnumerable<Order>> GetOrders(OrderStatus? status, OrderType? type)
+        public async Task<IEnumerable<OrderViewModel>> GetOrders(OrderStatus? status, OrderType? type)
         {
-            var query = context.Orders.AsQueryable();
+            var query = context.Orders
+                .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Item)
+                .AsQueryable();
 
             if (status.HasValue)
             {
@@ -25,8 +28,22 @@ namespace backend.Services
                 query = query.Where(o => o.Type == type.Value);
             }
 
+            var orders = await query
+                .Select(order => new OrderViewModel
+                {
+                    Id = order.Id,
+                    Type = order.Type,
+                    Status = order.Status,
+                    ItemCount = order.OrderItems.Count,
+                    Total = order.OrderItems.Sum(item => item.Item!.Price * item.Quantity),
+                    CreatedAt = order.CreatedAt,
+                    UpdatedAt = order.UpdatedAt,
+                })
+                .OrderBy(order => order.Id)
+                .ToListAsync();
+
             logger.LogInformation("Fetched orders");
-            return await query.ToListAsync();
+            return orders;
         }
 
         public async Task<OrderDetail?> GetOrder(string id)
@@ -131,7 +148,7 @@ namespace backend.Services
             {
                 await transaction.RollbackAsync();
                 logger.LogWarning("An error occurred: {ErrorMessage}", ex.Message);
-                return null;
+                throw;
             }
             catch (Exception ex)
             {

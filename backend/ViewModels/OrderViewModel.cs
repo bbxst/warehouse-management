@@ -2,6 +2,16 @@
 
 namespace backend.ViewModels
 {
+    public class OrderViewModel
+    {
+        public required string Id { get; set; }
+        public OrderType Type { get; set; }
+        public OrderStatus Status { get; set; }
+        public decimal ItemCount { get; set; }
+        public decimal Total { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
     public class OrderDetail
     {
         public required string Id { get; set; }
