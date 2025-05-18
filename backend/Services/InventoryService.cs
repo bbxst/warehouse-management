@@ -57,7 +57,8 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
             {
                 Id = itemId,
                 Name = item.Name,
-                Price = item.Price
+                Price = item.Price,
+                Status = item.Status
             };
 
             context.Inventory.Add(newItem);
@@ -93,6 +94,7 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
 
             existingItem.Name = item.Name;
             existingItem.Price = item.Price;
+            existingItem.Status = item.Status;
             existingItem.UpdatedAt = DateTime.UtcNow;
             var complete = await context.SaveChangesAsync() > 0;
 
