@@ -13,9 +13,9 @@ namespace backend.Controllers
         private readonly IInventoryService inventoryService = inventoryService;
 
         [HttpGet]
-        public async Task<IActionResult> GetItems([FromQuery] string? name)
+        public async Task<IActionResult> GetItems([FromQuery] string? name, [FromQuery] ItemStatus? status)
         {
-            var items = await inventoryService.GetItems(name);
+            var items = await inventoryService.GetItems(name, status);
 
             if (items == null || !items.Any())
             {

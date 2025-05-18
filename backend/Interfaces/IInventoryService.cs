@@ -5,7 +5,7 @@ namespace backend.Interfaces;
 
 public interface IInventoryService
 {
-  Task<IEnumerable<ItemViewModel>> GetItems(string? name);
+  Task<IEnumerable<ItemViewModel>> GetItems(string? name, ItemStatus? status);
   Task<Item?> GetItem(string id);
   Task<ItemViewModel> AddItem(AddOrEditItemViewModel item);
   Task<ItemViewModel> UpdateItem(string id, AddOrEditItemViewModel item);
