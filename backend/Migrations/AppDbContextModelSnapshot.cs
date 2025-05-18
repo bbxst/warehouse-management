@@ -45,7 +45,7 @@ namespace backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Inventory");
+                    b.ToTable("Inventory", (string)null);
                 });
 
             modelBuilder.Entity("backend.Models.Order", b =>
@@ -67,7 +67,7 @@ namespace backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Orders");
+                    b.ToTable("Orders", (string)null);
                 });
 
             modelBuilder.Entity("backend.Models.OrderItem", b =>
@@ -85,7 +85,7 @@ namespace backend.Migrations
 
                     b.HasIndex("ItemId");
 
-                    b.ToTable("OrderItems");
+                    b.ToTable("OrderItems", (string)null);
                 });
 
             modelBuilder.Entity("backend.Models.OrderItem", b =>

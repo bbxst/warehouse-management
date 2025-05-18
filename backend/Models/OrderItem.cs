@@ -7,11 +7,11 @@ namespace backend.Models;
 public class OrderItem
 {
     public required string OrderId { get; set; }
-    [JsonIgnore]
-    public Order? Order { get; set; }
+
+    public Order Order { get; set; } = null!;
 
     public required string ItemId { get; set; }
-    public Item? Item { get; set; }
+    public Item Item { get; set; } = null!;
 
     public decimal Quantity { get; set; }
 }
