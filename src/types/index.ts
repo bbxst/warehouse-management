@@ -20,3 +20,20 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface OrderDetail {
+  id: string;
+  type: OrderType;
+  status: OrderStatus;
+  total: number;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderDetailItem[];
+}
+
+export interface OrderDetailItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
