@@ -39,7 +39,7 @@ export async function apiRequest<T>(
 
   const res = await fetch(`https://localhost:5001${url}`, fetchOptions);
   if (!res.ok) {
-    throw new Error("Network response was not ok");
+    throw new Error(`${res.status} | ${await res.text()}`);
   }
   return await res.json();
 }
