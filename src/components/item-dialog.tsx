@@ -2,8 +2,13 @@
 
 import { z } from "zod";
 import { toast } from "sonner";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { Item } from "@/types";
+import { generateUniqueId } from "@/lib/utils";
 
 import {
   Dialog,
@@ -21,7 +26,7 @@ import {
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
-import { Button } from "./ui/button";
+import SubmitButton from "./submit-button";
 
 const itemSchema = z.object({
   id: z.string().nonempty({ message: "Id is required" }),
@@ -31,26 +36,81 @@ const itemSchema = z.object({
     .positive({ message: "Price must be greater than 0" }),
 });
 
+type ItemFormValues = z.infer<typeof itemSchema>;
+
 interface ItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  item?: Item;
 }
 
-export function ItemDialog({ open, onOpenChange }: ItemDialogProps) {
-  const form = useForm({
+export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
+  const isEditing = !!item;
+  const queryClient = useQueryClient();
+
+  const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemSchema),
-    defaultValues: {
+  });
+
+  useEffect(() => {
+    form.reset({
       id: "",
-      name: "",
-      price: 0,
+      name: item?.name || "",
+      price: item?.price || 0,
+    });
+  }, [item, form]);
+
+  const mutation = useMutation({
+    mutationFn: async (values: ItemFormValues) => {
+      if (isEditing) {
+        const response = await fetch(
+          `https://localhost:5001/api/inventory/${item?.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(values),
+          }
+        );
+        if (!response.ok) {
+          throw new Error("Failed to update item");
+        }
+      } else {
+        const response = await fetch("https://localhost:5001/api/inventory", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        });
+        if (!response.ok) {
+          throw new Error("Failed to create item");
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      toast.success(`Item ${isEditing ? "updated" : "created"} successfully`);
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast.error(`Error: ${error.message}`);
+    },
+    onSettled: () => {
+      if (!isEditing) {
+        form.reset({
+          id: generateUniqueId("INV"),
+          name: "",
+          price: 0,
+        });
+      }
     },
   });
 
-  function onSubmit(values: z.infer<typeof itemSchema>) {
-    toast(`${values.name}`);
-    onOpenChange(false);
-    form.reset();
-  }
+  const onSubmit = (values: z.infer<typeof itemSchema>) => {
+    mutation.mutate(values);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,20 +120,10 @@ export function ItemDialog({ open, onOpenChange }: ItemDialogProps) {
           <DialogDescription>All fields are required.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Id</FormLabel>
-                  <FormControl>
-                    <Input placeholder="INV000" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex flex-col gap-8"
+          >
             <FormField
               control={form.control}
               name="name"
@@ -100,7 +150,7 @@ export function ItemDialog({ open, onOpenChange }: ItemDialogProps) {
                 </FormItem>
               )}
             />
-            <Button type="submit">Submit</Button>
+            <SubmitButton state={mutation.isPending} />
           </form>
         </Form>
       </DialogContent>

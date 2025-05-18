@@ -1,13 +1,15 @@
 "use client";
 
 import {
-  DiamondPlus,
+  ClipboardPlus,
   FileText,
   LayoutDashboard,
   Package,
   PackagePlus,
   ShoppingCart,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import {
   Sidebar,
@@ -21,10 +23,15 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "./ui/sidebar";
-import { usePathname } from "next/navigation";
-import { Button } from "./ui/button";
-import Image from "next/image";
-import Link from "next/link";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
+import { Button, buttonVariants } from "./ui/button";
+import { ItemDialog } from "./item-dialog";
+import { useState } from "react";
 
 const items = [
   {
@@ -52,26 +59,47 @@ const items = [
 export function AppSidebar() {
   const pathname = usePathname();
 
+  const [open, setOpen] = useState(false);
+
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex justify-between items-center h-14 p-3">
+        <div className="flex justify-between items-center h-14 px-3">
           <SidebarTrigger />
-          <Image
-            className="w-[80px] h-[20px] mr-2"
-            src="/light-logo.png"
-            width={160}
-            height={50}
-            alt="logo"
-          />
-        </div>
-        <div className="flex flex-col px-3 gap-2">
-          <Button>
-            <PackagePlus /> Add Item
-          </Button>
-          <Button>
-            <DiamondPlus /> Place Order
-          </Button>
+          <div className="flex gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="size-10"
+                    onClick={() => setOpen(true)}
+                  >
+                    <PackagePlus className="size-6" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Add Item</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href="/place-order"
+                    className={buttonVariants({
+                      variant: "ghost",
+                      className: "size-10",
+                    })}
+                  >
+                    <ClipboardPlus className="size-6" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Place Order</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -97,6 +125,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        <ItemDialog open={open} onOpenChange={setOpen} />
       </SidebarContent>
     </Sidebar>
   );

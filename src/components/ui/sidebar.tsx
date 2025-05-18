@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
-import { PanelLeftIcon } from "lucide-react";
+import { AlignLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -139,7 +139,7 @@ function SidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
+            "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex-1 flex overflow-hidden",
             className
           )}
           {...props}
@@ -258,22 +258,27 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, state, isMobile } = useSidebar();
 
   return (
     <Button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
-      size="icon"
-      className={cn("size-8", className)}
+      className={cn("size-10", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      {isMobile ? (
+        <AlignLeft className="size-6" />
+      ) : state === "collapsed" ? (
+        <PanelLeftOpen className="size-6" />
+      ) : (
+        <PanelLeftClose className="size-6" />
+      )}
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
