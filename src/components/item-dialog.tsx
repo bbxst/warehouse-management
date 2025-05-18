@@ -24,16 +24,25 @@ import {
   FormLabel,
   FormMessage,
 } from "./ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Input } from "./ui/input";
 import { SubmitButton } from "./submit-button";
-import { apiRequest } from "@/lib/utils";
+import { apiRequest, getItemStatusLabel } from "@/lib/utils";
 import { useSidebar } from "./ui/sidebar";
+import { ItemStatus } from "@/types/enums";
 
 const itemSchema = z.object({
   name: z.string().nonempty({ message: "Name is required" }),
   price: z.coerce
     .number()
     .positive({ message: "Price must be greater than 0" }),
+  status: z.coerce.number().nonnegative({ message: "Invalid status" }),
 });
 
 type ItemFormValues = z.infer<typeof itemSchema>;
@@ -56,7 +65,8 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
   useEffect(() => {
     form.reset({
       name: item?.name || "",
-      price: item?.price || 0,
+      price: item?.price || 1,
+      status: item?.status || ItemStatus.INCOMING,
     });
   }, [item, form]);
 
@@ -79,7 +89,8 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
       if (!isEditing) {
         form.reset({
           name: "",
-          price: 0,
+          price: 1,
+          status: ItemStatus.INCOMING,
         });
       }
       onOpenChange(false);
@@ -123,8 +134,40 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
                 <FormItem>
                   <FormLabel>Price</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="0" {...field} />
+                    <Input type="number" placeholder="1" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select
+                    value={field.value.toString()}
+                    onValueChange={field.onChange}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={ItemStatus.ACTIVE.toString()}>
+                        {getItemStatusLabel(ItemStatus.ACTIVE)}
+                      </SelectItem>
+                      <SelectItem value={ItemStatus.ARRIVED.toString()}>
+                        {getItemStatusLabel(ItemStatus.ARRIVED)}
+                      </SelectItem>
+                      <SelectItem value={ItemStatus.INCOMING.toString()}>
+                        {getItemStatusLabel(ItemStatus.INCOMING)}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <FormMessage />
                 </FormItem>
               )}
