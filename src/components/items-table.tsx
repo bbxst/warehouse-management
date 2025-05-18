@@ -40,7 +40,7 @@ export function ItemsTable() {
   };
 
   return (
-    <>
+    <div className="flex-1 md:border md:rounded-md md:p-6">
       <Table>
         <TableHeader>
           <TableRow className="[&>th]:font-bold text-mute-foreground">
@@ -48,6 +48,8 @@ export function ItemsTable() {
             <TableHead>Name</TableHead>
             <TableHead>Price</TableHead>
             <TableHead>Quantity</TableHead>
+            <TableHead>Added on</TableHead>
+            <TableHead>Last update</TableHead>
             <TableHead className="w-[100px]">Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -66,6 +68,13 @@ export function ItemsTable() {
                 <TableCell>{item.id}</TableCell>
                 <TableCell>{item.name}</TableCell>
                 <TableCell>฿ {item.price.toLocaleString()}</TableCell>
+                <TableCell>{item.quantity}</TableCell>
+                <TableCell>
+                  {new Date(item.createdAt).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  {new Date(item.updatedAt).toLocaleDateString()}
+                </TableCell>
                 <TableCell>{item.quantity}</TableCell>
                 <TableCell className="w-[100px] pl-0">
                   <div>
@@ -99,6 +108,6 @@ export function ItemsTable() {
         url={`https://localhost:5001/api/inventory/${selected?.id}`}
         invalidateKey="inventory"
       />
-    </>
+    </div>
   );
 }
