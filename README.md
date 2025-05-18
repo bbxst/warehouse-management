@@ -19,6 +19,17 @@ pnpm dev
 bun dev
 ```
 
+#### Build and Run
+
+To build the frontend for production and start the server:
+
+```bash
+npm run build
+npm start
+```
+
+Or use the equivalent commands for your package manager.
+
 Open [http://localhost:3000](http://localhost:3000) in your browser to view the app.
 
 You can start editing the page by modifying [`app/page.tsx`](src/app/page.tsx). The page auto-updates as you edit the file.
