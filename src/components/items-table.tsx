@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Edit, Loader2, Trash } from "lucide-react";
 
 import {
@@ -14,27 +14,19 @@ import {
 import { Button } from "./ui/button";
 import { ItemDialog } from "./item-dialog";
 import { DeleteDialog } from "./delete-dialog";
-// import { generateUniqueId } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Item } from "@/types";
+import { apiRequest } from "@/lib/utils";
 
 export function ItemsTable() {
   const [open, setOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState<Item>();
 
-  useEffect(() => {
-    console.log("Selected item updated:", selected);
-  }, [selected]);
-
   const { data, isLoading } = useQuery<Item[]>({
     queryKey: ["inventory"],
     queryFn: async () => {
-      const res = await fetch("https://localhost:5001/api/inventory");
-      if (!res.ok) {
-        throw new Error("Network response was not ok");
-      }
-      return res.json();
+      return await apiRequest<Item[]>("/api/inventory", "GET");
     },
   });
 
