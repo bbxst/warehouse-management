@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Item } from "@/types";
-import { generateUniqueId } from "@/lib/utils";
 
 import {
   Dialog,
@@ -25,15 +24,25 @@ import {
   FormLabel,
   FormMessage,
 } from "./ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Input } from "./ui/input";
-import SubmitButton from "./submit-button";
+import { SubmitButton } from "./submit-button";
+import { apiRequest, getItemStatusLabel } from "@/lib/utils";
+import { useSidebar } from "./ui/sidebar";
+import { ItemStatus } from "@/types/enums";
 
 const itemSchema = z.object({
-  id: z.string().nonempty({ message: "Id is required" }),
   name: z.string().nonempty({ message: "Name is required" }),
   price: z.coerce
     .number()
     .positive({ message: "Price must be greater than 0" }),
+  status: z.coerce.number().nonnegative({ message: "Invalid status" }),
 });
 
 type ItemFormValues = z.infer<typeof itemSchema>;
@@ -47,6 +56,7 @@ interface ItemDialogProps {
 export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
   const isEditing = !!item;
   const queryClient = useQueryClient();
+  const { openMobile, setOpenMobile } = useSidebar();
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemSchema),
@@ -54,45 +64,23 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
 
   useEffect(() => {
     form.reset({
-      id: "defalut",
       name: item?.name || "",
-      price: item?.price || 0,
+      price: item?.price || 1,
+      status: item?.status || ItemStatus.INCOMING,
     });
   }, [item, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: ItemFormValues) => {
       if (isEditing) {
-        const response = await fetch(
-          `https://localhost:5001/api/inventory/${item?.id}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(values),
-          }
-        );
-        if (!response.ok) {
-          throw new Error("Failed to update item");
-        }
+        await apiRequest(`/api/inventory/${item?.id}`, "PATCH", values);
       } else {
-        const response = await fetch("https://localhost:5001/api/inventory", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(values),
-        });
-        if (!response.ok) {
-          throw new Error("Failed to create item");
-        }
+        await apiRequest(`/api/inventory`, "POST", values);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       toast.success(`Item ${isEditing ? "updated" : "created"} successfully`);
-      onOpenChange(false);
     },
     onError: (error) => {
       toast.error(`Error: ${error.message}`);
@@ -100,11 +88,13 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
     onSettled: () => {
       if (!isEditing) {
         form.reset({
-          id: generateUniqueId("INV"),
           name: "",
-          price: 0,
+          price: 1,
+          status: ItemStatus.INCOMING,
         });
       }
+      onOpenChange(false);
+      if (openMobile) setOpenMobile(false);
     },
   });
 
@@ -144,8 +134,40 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
                 <FormItem>
                   <FormLabel>Price</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="0" {...field} />
+                    <Input type="number" placeholder="1" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select
+                    value={field.value.toString()}
+                    onValueChange={field.onChange}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={ItemStatus.ACTIVE.toString()}>
+                        {getItemStatusLabel(ItemStatus.ACTIVE)}
+                      </SelectItem>
+                      <SelectItem value={ItemStatus.ARRIVED.toString()}>
+                        {getItemStatusLabel(ItemStatus.ARRIVED)}
+                      </SelectItem>
+                      <SelectItem value={ItemStatus.INCOMING.toString()}>
+                        {getItemStatusLabel(ItemStatus.INCOMING)}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <FormMessage />
                 </FormItem>
               )}

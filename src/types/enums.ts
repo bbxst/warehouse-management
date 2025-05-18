@@ -7,3 +7,9 @@ export enum OrderType {
   INCOMING,
   OUTGOING,
 }
+export enum ItemStatus {
+  DELETED,
+  ACTIVE,
+  ARRIVED,
+  INCOMING,
+}

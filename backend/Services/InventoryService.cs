@@ -1,6 +1,7 @@
 using backend.Data;
 using backend.Models;
 using backend.Interfaces;
+using backend.ViewModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Services;
@@ -10,7 +11,7 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
     private readonly AppDbContext context = context;
     private readonly ILogger<InventoryService> logger = logger;
 
-    public async Task<IEnumerable<Item>> GetItems(string? name = null)
+    public async Task<IEnumerable<ItemViewModel>> GetItems(string? name = null, ItemStatus? status = null)
     {
         var query = context.Inventory.AsQueryable();
 
@@ -19,72 +20,67 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
             query = query.Where(item => item.Name.ToLower().Contains(name.ToLower()));
         }
 
-        logger.LogInformation("Fetched items.");
-        return await query.ToListAsync();
+        if (status.HasValue)
+        {
+            query = query.Where(item => item.Status == status.Value);
+        }
+
+        var items = await query
+            .Select(item => new ItemViewModel
+            {
+                Id = item.Id,
+                Name = item.Name,
+                Price = item.Price,
+                Quantity = item.Quantity,
+                Total = item.Quantity * item.Price,
+                Status = item.Status,
+                CreatedAt = item.CreatedAt,
+                UpdatedAt = item.UpdatedAt,
+            })
+            .OrderBy(item => item.Id)
+            .ToListAsync();
+
+        return items;
     }
 
     public async Task<Item?> GetItem(string id)
     {
-        logger.LogInformation("Fetched item.");
         return await context.Inventory.FindAsync(id);
     }
 
-    public async Task<string> AddItem(Item item)
+    public async Task<ItemViewModel> AddItem(AddOrEditItemViewModel item)
     {
         try
         {
             var itemId = await GenerateItemIdAsync();
-            item.Id = itemId;
-            context.Inventory.Add(item);
-            await context.SaveChangesAsync();
-            
-            logger.LogInformation("Added item: {ItemId}",itemId);
-            return "Added Item.";
+            var newItem = new Item
+            {
+                Id = itemId,
+                Name = item.Name,
+                Price = item.Price,
+                Status = item.Status
+            };
+
+            context.Inventory.Add(newItem);
+            var completed = await context.SaveChangesAsync() > 0;
+
+            if (!completed)
+            {
+                logger.LogError("Can not update database");
+                throw new DbUpdateException("Can not update database");
+            }
+
+            logger.LogInformation("Added item: {ItemId}", itemId);
+            return ItemViewModel.FromEntity(newItem);
         }
         catch (Exception ex)
         {
             logger.LogError("Failed to add item: {Message}", ex.Message);
-            return "Failed to add item.";
-        }
-
-    }
-
-    public async Task<string> UpdateItem(Item item)
-    {
-        try
-        {
-            var existingItem = await context.Inventory.FindAsync(item.Id);
-
-            if (existingItem == null)
-            {
-                var message = $"Update failed: Item with ID {item.Id} not found.";
-                logger.LogWarning(message);
-                return message;
-            }
-
-            context.Entry(existingItem).CurrentValues.SetValues(item);
-            var result = await context.SaveChangesAsync();
-
-            if (result > 0)
-            {
-                var message = $"Successfully updated item with ID {item.Id}.";
-                logger.LogInformation(message);
-                return message;
-            }
-
-            var noChangeMessage = $"Update operation did not affect any rows for item ID {item.Id}.";
-            logger.LogWarning(noChangeMessage);
-            return noChangeMessage;
-        }
-        catch (Exception ex)
-        {
-            var errorMessage = $"Error updating item with ID {item.Id}: {ex.Message}";
-            logger.LogError(ex, errorMessage);
-            return errorMessage;
+            throw new Exception($"Failed to add item: {ex.Message}");
         }
     }
 
-    public async Task<string> DeleteItem(string id)
+    public async Task<ItemViewModel> UpdateItem(string id, AddOrEditItemViewModel item)
     {
         try
         {
@@ -92,23 +88,61 @@ public class InventoryService(AppDbContext context, ILogger<InventoryService> lo
 
             if (existingItem == null)
             {
-                var message = $"Delete failed: Item with ID {id} not found.";
-                logger.LogWarning(message);
-                return message;
+                logger.LogWarning("Update failed: Item with ID {Id} not found.", id);
+                throw new KeyNotFoundException($"Update failed: Item with ID {id} not found.");
             }
 
-            context.Inventory.Remove(existingItem);
-            await context.SaveChangesAsync();
+            existingItem.Name = item.Name;
+            existingItem.Price = item.Price;
+            existingItem.Status = item.Status;
+            existingItem.UpdatedAt = DateTime.UtcNow;
+            var complete = await context.SaveChangesAsync() > 0;
 
-            var successMessage = $"Successfully deleted item with ID {id}.";
-            logger.LogInformation(successMessage);
-            return successMessage;
+            if (complete)
+            {
+                var updatedItem = ItemViewModel.FromEntity(existingItem);
+                logger.LogInformation("Successfully updated item with ID {Id}.", id);
+                return updatedItem;
+            }
+
+            logger.LogError("Can not update database");
+            throw new DbUpdateException("Can not update database");
         }
         catch (Exception ex)
         {
-            var errorMessage = $"Error deleting item with ID {id}: {ex.Message}";
-            logger.LogError(ex, errorMessage);
-            return errorMessage;
+            logger.LogError("Failed to update item: {Message}", ex.Message);
+            throw new Exception($"Failed to update item: {ex.Message}");
+        }
+    }
+
+    public async Task<bool> DeleteItem(string id)
+    {
+        try
+        {
+            var existingItem = await context.Inventory.FindAsync(id);
+
+            if (existingItem == null)
+            {
+                logger.LogWarning("Delete failed: Item with ID {id} not found.", id);
+                throw new KeyNotFoundException($"Delete failed: Item with ID {id} not found.");
+            }
+
+            existingItem.Status = ItemStatus.Deleted;
+            var completed = await context.SaveChangesAsync() > 0;
+
+            if (completed)
+            {
+                logger.LogInformation("Successfully deleted item with ID {id}.", id);
+                return true;
+            }
+
+            logger.LogError("Can not update database");
+            throw new DbUpdateException("Can not update database");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Failed to delete item: {Message}", ex.Message);
+            throw new Exception($"Failed to delete item: {ex.Message}");
         }
     }
 

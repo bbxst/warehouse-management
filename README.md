@@ -7,16 +7,18 @@ It also includes a backend implemented in .NET, located in the [`backend/`](back
 
 ### Frontend
 
+> **Note:** If you want to use `npm` instead of `pnpm`, rename or remove the `pnpm-lock.yaml` file before installing dependencies.
+
+To install the frontend dependencies, run:
+
+```bash
+pnpm install
+```
+
 To start the Next.js development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
 #### Build and Run
@@ -24,8 +26,7 @@ bun dev
 To build the frontend for production and start the server:
 
 ```bash
-npm run build
-npm start
+pnpm run build && pnpm start
 ```
 
 Or use the equivalent commands for your package manager.

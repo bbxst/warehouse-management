@@ -1,6 +1,8 @@
 using backend.Models;
 using backend.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using backend.ViewModels;
+using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers
 {
@@ -11,9 +13,9 @@ namespace backend.Controllers
         private readonly IInventoryService inventoryService = inventoryService;
 
         [HttpGet]
-        public async Task<IActionResult> GetItems([FromQuery] string? name)
+        public async Task<IActionResult> GetItems([FromQuery] string? name, [FromQuery] ItemStatus? status)
         {
-            var items = await inventoryService.GetItems(name);
+            var items = await inventoryService.GetItems(name, status);
 
             if (items == null || !items.Any())
             {
@@ -37,47 +39,77 @@ namespace backend.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddItem([FromBody] Item item)
+        public async Task<IActionResult> AddItem([FromBody] AddOrEditItemViewModel item)
         {
-            if (item == null)
+            try
             {
-                return BadRequest("Item cannot be null");
+                if (item == null)
+                {
+                    return BadRequest("Item cannot be null");
+                }
+
+                var createdItemId = await inventoryService.AddItem(item);
+
+                return CreatedAtAction(nameof(GetItem), new { id = createdItemId }, item);
             }
-
-            var createdItem = await inventoryService.AddItem(item);
-
-            return CreatedAtAction(nameof(GetItem), new { id = item.Id }, item);
+            catch (DbUpdateException ex)
+            {
+                return Problem(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return Problem(ex.Message);
+            }
         }
 
         [HttpPatch("{id}")]
-        public async Task<IActionResult> UpdateItem(string id, [FromBody] Item item)
+        public async Task<IActionResult> UpdateItem(string id, [FromBody] AddOrEditItemViewModel item)
         {
-            if (item == null || id != item.Id)
+            try
             {
-                return BadRequest("Item cannot be null and Id must match");
+                if (item == null)
+                {
+                    return BadRequest("Item cannot be null.");
+                }
+
+                var updatedItem = await inventoryService.UpdateItem(id, item);
+
+                return Ok(updatedItem);
             }
-
-            var updatedItem = await inventoryService.UpdateItem(item);
-
-            if (updatedItem == null)
+            catch (KeyNotFoundException ex)
             {
-                return NotFound($"Item with Id {id} not found");
+                return NotFound(ex.Message);
             }
-
-            return Ok(updatedItem);
+            catch (DbUpdateException ex)
+            {
+                return Problem(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return Problem(ex.Message);
+            }
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteItem(string id)
         {
-            var deleted = await inventoryService.DeleteItem(id);
-
-            if (deleted == null)
+            try
             {
-                return NotFound($"Item with Id {id} not found");
+                var deleted = await inventoryService.DeleteItem(id);
+                return NoContent();
             }
-
-            return Ok(deleted);
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (DbUpdateException ex)
+            {
+                return Problem(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return Problem(ex.Message);
+            }
         }
     }
 }

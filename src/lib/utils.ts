@@ -1,4 +1,4 @@
-import { OrderStatus, OrderType } from "@/types/enums";
+import { ItemStatus, OrderStatus, OrderType } from "@/types/enums";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -39,7 +39,7 @@ export async function apiRequest<T>(
 
   const res = await fetch(`https://localhost:5001${url}`, fetchOptions);
   if (!res.ok) {
-    throw new Error("Network response was not ok");
+    throw new Error(`${res.status} | ${await res.text()}`);
   }
   return await res.json();
 }
@@ -63,6 +63,21 @@ export function getOrderTypeLabel(type: OrderType): string {
       return "Incoming";
     case OrderType.OUTGOING:
       return "Outgoing";
+    default:
+      return "Unknown";
+  }
+}
+
+export function getItemStatusLabel(status: ItemStatus): string {
+  switch (status) {
+    case ItemStatus.DELETED:
+      return "Deleted";
+    case ItemStatus.ACTIVE:
+      return "Active";
+    case ItemStatus.ARRIVED:
+      return "Arrived";
+    case ItemStatus.INCOMING:
+      return "Incoming";
     default:
       return "Unknown";
   }

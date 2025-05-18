@@ -22,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
+  useSidebar,
 } from "./ui/sidebar";
 import {
   Tooltip,
@@ -58,6 +59,7 @@ const items = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
 
   const [open, setOpen] = useState(false);
 
@@ -73,7 +75,9 @@ export function AppSidebar() {
                   <Button
                     variant="ghost"
                     className="size-10"
-                    onClick={() => setOpen(true)}
+                    onClick={() => {
+                      setOpen(true);
+                    }}
                   >
                     <PackagePlus className="size-6" />
                   </Button>
@@ -86,6 +90,7 @@ export function AppSidebar() {
                 <TooltipTrigger asChild>
                   <Link
                     href="/place-order"
+                    onClick={() => setOpenMobile(false)}
                     className={buttonVariants({
                       variant: "ghost",
                       className: "size-10",
@@ -115,7 +120,7 @@ export function AppSidebar() {
                     isActive={pathname === item.url}
                     className="data-[size=lg]:gap-4 data-[size=lg]:px-4 font-medium"
                   >
-                    <Link href={item.url}>
+                    <Link href={item.url} onClick={() => setOpenMobile(false)}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>

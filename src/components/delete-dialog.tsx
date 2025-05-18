@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { toast } from "sonner";
+import { apiRequest } from "@/lib/utils";
 
 interface DeleteDialogProps {
   open: boolean;
@@ -30,16 +31,7 @@ export function DeleteDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(url, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-      return response.json();
+      await apiRequest(`${url}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [invalidateKey] });

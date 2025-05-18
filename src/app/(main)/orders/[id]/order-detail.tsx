@@ -2,15 +2,14 @@
 
 import { z } from "zod";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Trash } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { Item } from "@/types";
-import { OrderType } from "@/types/enums";
-import { apiRequest, getOrderTypeLabel } from "@/lib/utils";
+import { OrderDetail, OrderDetailItem } from "@/types";
+import { apiRequest } from "@/lib/utils";
 
 import {
   Form,
@@ -33,13 +32,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -52,39 +44,36 @@ import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/submit-button";
 
 const orderItemSchema = z.object({
-  id: z.string().nonempty("ID is required"),
+  id: z.string().nonempty("Id is required"),
   quantity: z.number().min(1, "Quantity must be positive"),
 });
 
 const addOrderSchema = z.object({
-  type: z.coerce.number(),
+  id: z.string().nonempty({ message: "Id is required" }),
   items: z.array(orderItemSchema).nonempty("At least one item is required"),
 });
 
 type AddOrderFormData = z.infer<typeof addOrderSchema>;
 
-export default function PlaceOrderPage() {
-  const [items, setItems] = useState<Item[]>([]);
+export default function OrderDetailClient({ id }: { id: string }) {
+  const [items, setItems] = useState<OrderDetailItem[]>([]);
   const [search, setSerch] = useState<string>("");
   const [total, setTotal] = useState<number>(0);
 
   const queryClient = useQueryClient();
 
-  const { data } = useQuery<Item[]>({
-    queryKey: ["inventory", search],
+  const { data: orderDetail, isLoading } = useQuery<OrderDetail>({
+    queryKey: ["orders", id],
     queryFn: async () => {
-      return await apiRequest<Item[]>(
-        `/api/inventory?status=1&name=${search}`,
-        "GET"
-      );
+      return await apiRequest<OrderDetail>(`/api/orders/${id}`, "GET");
     },
-    enabled: search.length > 0,
+    enabled: !!id,
   });
 
   const form = useForm<AddOrderFormData>({
     resolver: zodResolver(addOrderSchema),
     defaultValues: {
-      type: OrderType.INCOMING,
+      id: id,
       items: [],
     },
   });
@@ -94,7 +83,37 @@ export default function PlaceOrderPage() {
     name: "items",
   });
 
-  const handleAddItem = (item: Item) => {
+  useEffect(() => {
+    if (!!orderDetail) {
+      setItems(orderDetail.items);
+      setTotal(orderDetail.total);
+      const mappedItems = orderDetail.items.map((item) => {
+        return {
+          id: item.id,
+          quantity: item.quantity,
+        };
+      });
+      if (mappedItems.length > 0) {
+        form.setValue(
+          "items",
+          mappedItems as [(typeof mappedItems)[0], ...typeof mappedItems]
+        );
+      }
+    }
+  }, [form, orderDetail]);
+
+  const { data: searchItem } = useQuery<OrderDetailItem[]>({
+    queryKey: ["inventory", search],
+    queryFn: async () => {
+      return await apiRequest<OrderDetailItem[]>(
+        `/api/inventory?status=1&name=${search}`,
+        "GET"
+      );
+    },
+    enabled: search.length > 0,
+  });
+
+  const handleAddItem = (item: OrderDetailItem) => {
     if (items.some((i) => i.id === item.id)) {
       toast.error("Item already added to the order.");
       setSerch("");
@@ -120,7 +139,11 @@ export default function PlaceOrderPage() {
 
   const mutation = useMutation({
     mutationFn: async (data: AddOrderFormData) => {
-      await apiRequest<AddOrderFormData>("/api/orders", "POST", data);
+      await apiRequest<AddOrderFormData>(
+        `/api/orders/${id}/items`,
+        "PUT",
+        data
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
@@ -140,44 +163,19 @@ export default function PlaceOrderPage() {
     mutation.mutate(data);
   };
 
+  if (isLoading) return <div>Loading...</div>;
+
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="flex-1 flex flex-col h-full p-6 gap-3 border rounded-lg overflow-hidden"
+        className="flex-1 flex flex-col h-full p-6 gap-6 border rounded-lg overflow-hidden"
       >
-        <div className="flex-1 flex flex-col gap-3 overflow-hidden">
+        <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold">Place Order</h1>
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value.toString()}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Order Type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={OrderType.INCOMING.toString()}>
-                        {getOrderTypeLabel(OrderType.INCOMING)}
-                      </SelectItem>
-                      <SelectItem value={OrderType.OUTGOING.toString()}>
-                        {getOrderTypeLabel(OrderType.OUTGOING)}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <h1 className="text-xl font-semibold">{id}</h1>
           </div>
-          <div className="relative">
+          {/* <div className="relative">
             <Command>
               <CommandInput
                 value={search}
@@ -188,7 +186,7 @@ export default function PlaceOrderPage() {
                 <CommandList className="absolute top-9 w-full z-10 bg-white border border-t-0">
                   <CommandEmpty>No results found.</CommandEmpty>
                   <CommandGroup>
-                    {data?.map((item) => (
+                    {searchItem?.map((item) => (
                       <CommandItem
                         key={item.id}
                         onSelect={() => handleAddItem(item)}
@@ -200,8 +198,8 @@ export default function PlaceOrderPage() {
                 </CommandList>
               )}
             </Command>
-          </div>
-          <div className="overflow-y-auto border flex-1">
+          </div> */}
+          <div className="flex-1 flex flex-col overflow-hidden border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -283,11 +281,11 @@ export default function PlaceOrderPage() {
             ฿ {total.toLocaleString()}
           </span>
         </div>
-        <SubmitButton
+        {/* <SubmitButton
           isValid={form.formState.isValid}
           state={mutation.isPending}
           text="Place Order"
-        />
+        /> */}
       </form>
     </Form>
   );
