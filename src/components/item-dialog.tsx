@@ -54,7 +54,7 @@ export function ItemDialog({ open, onOpenChange, item }: ItemDialogProps) {
 
   useEffect(() => {
     form.reset({
-      id: "",
+      id: "defalut",
       name: item?.name || "",
       price: item?.price || 0,
     });

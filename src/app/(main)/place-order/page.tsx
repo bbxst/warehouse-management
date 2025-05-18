@@ -47,7 +47,7 @@ const orderItemSchema = z.object({
   quantity: z.number().min(0, "Quantity must be non-negative"), // Matches `decimal Quantity`
 });
 
-export const addOrderSchema = z.object({
+const addOrderSchema = z.object({
   type: z.coerce.number(),
   items: z.array(orderItemSchema).nonempty("At least one item is required"),
 });
