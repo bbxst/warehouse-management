@@ -10,7 +10,11 @@ function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 10 * 1000,
+        staleTime: 15 * 1000,
+        retry: false,
+      },
+      mutations: {
+        retry: false,
       },
     },
   });
