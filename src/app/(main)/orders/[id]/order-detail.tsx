@@ -3,13 +3,17 @@
 import { z } from "zod";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { Trash } from "lucide-react";
+import { CheckCircle, Edit, Trash } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrderDetail, OrderDetailItem } from "@/types";
-import { apiRequest } from "@/lib/utils";
+import {
+  apiRequest,
+  getOrderStatusLabel,
+  getOrderTypeLabel,
+} from "@/lib/utils";
 
 import {
   Form,
@@ -42,6 +46,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/submit-button";
+import { OrderStatus, OrderType } from "@/types/enums";
+import { Badge } from "@/components/ui/badge";
 
 const orderItemSchema = z.object({
   id: z.string().nonempty("Id is required"),
@@ -49,7 +55,6 @@ const orderItemSchema = z.object({
 });
 
 const addOrderSchema = z.object({
-  id: z.string().nonempty({ message: "Id is required" }),
   items: z.array(orderItemSchema).nonempty("At least one item is required"),
 });
 
@@ -59,6 +64,7 @@ export default function OrderDetailClient({ id }: { id: string }) {
   const [items, setItems] = useState<OrderDetailItem[]>([]);
   const [search, setSerch] = useState<string>("");
   const [total, setTotal] = useState<number>(0);
+  const [isEdit, setIsEdit] = useState<boolean>(false);
 
   const queryClient = useQueryClient();
 
@@ -73,7 +79,6 @@ export default function OrderDetailClient({ id }: { id: string }) {
   const form = useForm<AddOrderFormData>({
     resolver: zodResolver(addOrderSchema),
     defaultValues: {
-      id: id,
       items: [],
     },
   });
@@ -110,7 +115,7 @@ export default function OrderDetailClient({ id }: { id: string }) {
         "GET"
       );
     },
-    enabled: search.length > 0,
+    enabled: search.length > 0 && isEdit,
   });
 
   const handleAddItem = (item: OrderDetailItem) => {
@@ -142,20 +147,19 @@ export default function OrderDetailClient({ id }: { id: string }) {
       await apiRequest<AddOrderFormData>(
         `/api/orders/${id}/items`,
         "PUT",
-        data
+        data.items
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast.success(`Order created successfully`);
     },
     onError: (error) => {
       toast.error(`Error: ${error.message}`);
     },
     onSettled: () => {
+      setIsEdit(false);
       form.reset();
-      setItems([]);
-      setTotal(0);
     },
   });
 
@@ -174,32 +178,74 @@ export default function OrderDetailClient({ id }: { id: string }) {
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold">{id}</h1>
+            <div className="space-x-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setIsEdit(!isEdit)}
+              >
+                <Edit /> Edit
+              </Button>
+              <Button type="button" variant="success" onClick={() => {}}>
+                <CheckCircle /> Approve
+              </Button>
+            </div>
           </div>
-          {/* <div className="relative">
-            <Command>
-              <CommandInput
-                value={search}
-                onValueChange={(search) => setSerch(search)}
-                placeholder="Search item name..."
-              />
-              {search.length > 0 && (
-                <CommandList className="absolute top-9 w-full z-10 bg-white border border-t-0">
-                  <CommandEmpty>No results found.</CommandEmpty>
-                  <CommandGroup>
-                    {searchItem?.map((item) => (
-                      <CommandItem
-                        key={item.id}
-                        onSelect={() => handleAddItem(item)}
-                      >
-                        {item.name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              )}
-            </Command>
-          </div> */}
-          <div className="flex-1 flex flex-col overflow-hidden border">
+          <div className="space-y-3">
+            <div className="space-x-6">
+              <span className="text-sm">Type</span>
+              <Badge>{getOrderTypeLabel(orderDetail?.type as OrderType)}</Badge>
+            </div>
+            <div className="space-x-6">
+              <span className="text-sm">Status</span>
+              <Badge>
+                {getOrderStatusLabel(orderDetail?.status as OrderStatus)}
+              </Badge>
+            </div>
+            <div className="space-x-6">
+              <span className="text-sm">Issued Date</span>
+              <span className="font-medium">
+                {new Date(
+                  orderDetail?.createdAt as string
+                ).toLocaleDateString()}
+              </span>
+            </div>
+            <div className="space-x-6">
+              <span className="text-sm">Last Update</span>
+              <span className="font-medium">
+                {new Date(
+                  orderDetail?.updatedAt as string
+                ).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+          {isEdit && (
+            <div className="relative">
+              <Command>
+                <CommandInput
+                  value={search}
+                  onValueChange={(search) => setSerch(search)}
+                  placeholder="Search item name..."
+                />
+                {search.length > 0 && (
+                  <CommandList className="absolute top-10 w-full z-10 bg-white border rounded-lg">
+                    <CommandEmpty>No results found.</CommandEmpty>
+                    <CommandGroup>
+                      {searchItem?.map((item) => (
+                        <CommandItem
+                          key={item.id}
+                          onSelect={() => handleAddItem(item)}
+                        >
+                          {item.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                )}
+              </Command>
+            </div>
+          )}
+          <div className="flex-1 flex flex-col overflow-hidden border rounded-lg p-3">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -207,7 +253,7 @@ export default function OrderDetailClient({ id }: { id: string }) {
                   <TableHead>Name</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Price</TableHead>
-                  <TableHead>Action</TableHead>
+                  {isEdit && fields.length > 1 && <TableHead>Action</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -219,7 +265,12 @@ export default function OrderDetailClient({ id }: { id: string }) {
                     <TableCell>{items[index].name}</TableCell>
                     <TableCell>
                       <Popover>
-                        <PopoverTrigger className="h-8 px-4 rounded-lg hover:bg-accent">
+                        <PopoverTrigger
+                          disabled={!isEdit}
+                          className={`h-8 px-4 rounded-lg ${
+                            isEdit && "hover:bg-accent"
+                          }`}
+                        >
                           {form.watch(`items.${index}.quantity`)}
                         </PopoverTrigger>
                         <PopoverContent className="flex w-fit gap-2">
@@ -260,15 +311,17 @@ export default function OrderDetailClient({ id }: { id: string }) {
                       </Popover>
                     </TableCell>
                     <TableCell>{items[index].price}</TableCell>
-                    <TableCell>
-                      <Button
-                        onClick={() => handleRemoveItem(index)}
-                        className="size-10"
-                        variant="ghost"
-                      >
-                        <Trash />
-                      </Button>
-                    </TableCell>
+                    {isEdit && fields.length > 1 && (
+                      <TableCell>
+                        <Button
+                          onClick={() => handleRemoveItem(index)}
+                          className="size-10"
+                          variant="ghost"
+                        >
+                          <Trash />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -281,11 +334,12 @@ export default function OrderDetailClient({ id }: { id: string }) {
             ฿ {total.toLocaleString()}
           </span>
         </div>
-        {/* <SubmitButton
-          isValid={form.formState.isValid}
-          state={mutation.isPending}
-          text="Place Order"
-        /> */}
+        {isEdit && (
+          <SubmitButton
+            isValid={form.formState.isDirty}
+            state={mutation.isPending}
+          />
+        )}
       </form>
     </Form>
   );
