@@ -1,6 +1,5 @@
-﻿using backend.Interfaces;
-using backend.Models;
-using backend.Services;
+﻿using backend.Models;
+using backend.Interfaces;
 using backend.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,12 +16,23 @@ namespace backend.Controllers
         {
             var result = await orderService.GetOrders(status, type);
 
-            if (result == null)
+            var orders = result.Select(o => new OrderViewModel
             {
-                return NotFound("No order found.");
+                Id = o.Id,
+                Type = o.Type,
+                Status = o.Status,
+                Total = o.OrderItems.Sum(oi => oi.Quantity * oi.Item.Price),
+                ItemCount = o.OrderItems.Count,
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt
+            });
+
+            if (orders == null)
+            {
+                return NotFound("No order found");
             }
 
-            return Ok(result);
+            return Ok(orders);
         }
 
         [HttpGet("{id}")]
@@ -31,7 +41,15 @@ namespace backend.Controllers
             try
             {
                 var result = await orderService.GetOrder(id);
-                return Ok(result);
+
+                var order = OrderDetailViewModel.MapToOrderDetail(result);
+
+                if (order == null)
+                {
+                    return NotFound("Order not found");
+                }
+
+                return Ok(order);
             }
             catch (KeyNotFoundException ex)
             {
@@ -44,18 +62,20 @@ namespace backend.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddOrder([FromBody] AddOrderDto order)
+        public async Task<IActionResult> AddOrder([FromBody] AddOrderViewModel addOrder)
         {
             try
             {
-                if (order == null)
+                if (addOrder == null)
                 {
                     return BadRequest("Item cannot be null");
                 }
 
-                var result = await orderService.AddOrder(order);
+                var result = await orderService.AddOrder(addOrder);
 
-                return CreatedAtAction(nameof(GetOrder), new { id = result }, order);
+                var order = OrderViewModel.MapToOrderWithNoItem(result);
+
+                return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
             }
             catch (ArgumentException ex)
             {
@@ -72,13 +92,15 @@ namespace backend.Controllers
         {
             try
             {
-                var orderStatus = new UpdateOrderStatus
+                var orderStatus = new UpdateOrderStatusViewModel
                 {
                     Id = id,
                     Status = status
                 };
 
                 var result = await orderService.UpdateOrder(orderStatus);
+
+                var order = OrderViewModel.MapToOrderWithNoItem(result);
 
                 return Ok(result);
             }
@@ -89,11 +111,11 @@ namespace backend.Controllers
         }
 
         [HttpPut("{id}/items")]
-        public async Task<IActionResult> UpdateOrderItem(string id, [FromBody] List<OrderItemUpdateDto> items)
+        public async Task<IActionResult> UpdateOrderItem(string id, [FromBody] List<OrderItemViewModel> items)
         {
             try
             {
-                var updateOrderDto = new UpdateMultipleOrderItemsDto
+                var updateOrderDto = new UpdateOrderItemsViewModel
                 {
                     OrderId = id,
                     Items = items
@@ -101,7 +123,13 @@ namespace backend.Controllers
 
                 var result = await orderService.UpdateMultipleOrderItems(updateOrderDto);
 
-                return Ok(result);
+                var order = OrderViewModel.MapToOrderWithNoItem(result);
+
+                return Ok(order);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest($"{ex.Message}");
             }
             catch (Exception ex)
             {
@@ -116,7 +144,9 @@ namespace backend.Controllers
             {
                 var result = await orderService.DeleteOrder(id);
 
-                return Ok(result);
+                var order = OrderViewModel.MapToOrderWithNoItem(result);
+
+                return Ok(order);
             }
             catch (Exception ex)
             {

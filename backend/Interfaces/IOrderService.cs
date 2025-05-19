@@ -5,12 +5,12 @@ namespace backend.Interfaces
 {
     public interface IOrderService
     {
-        Task<IEnumerable<OrderViewModel>> GetOrders(OrderStatus? status, OrderType? type);
-        Task<OrderDetail?> GetOrder(string id);
-        Task<string?> AddOrder(AddOrderDto order);
-        Task<string> UpdateOrder(UpdateOrderStatus orderStatus);
-        Task<string> UpdateMultipleOrderItems(UpdateMultipleOrderItemsDto updateDto);
-        Task<string> DeleteOrder(string id);
+        Task<IEnumerable<Order>> GetOrders(OrderStatus? status, OrderType? type);
+        Task<Order> GetOrder(string id);
+        Task<Order> AddOrder(AddOrderViewModel order);
+        Task<Order> UpdateOrder(UpdateOrderStatusViewModel orderStatus);
+        Task<Order> UpdateMultipleOrderItems(UpdateOrderItemsViewModel updateDto);
+        Task<Order> DeleteOrder(string id);
     }
 }
  

@@ -11,8 +11,39 @@ namespace backend.ViewModels
         public decimal Total { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        public static OrderViewModel MapToOrder(Order order)
+        {
+            return order == null || order.OrderItems == null || order.OrderItems.Count == 0
+                ? throw new ArgumentNullException(nameof(order))
+                : new OrderViewModel
+                {
+                    Id = order.Id,
+                    Type = order.Type,
+                    Status = order.Status,
+                    ItemCount = order.OrderItems.Count,
+                    Total = order.OrderItems.Sum(item => item.Item.Price * item.Quantity),
+                    CreatedAt = order.CreatedAt,
+                    UpdatedAt = order.UpdatedAt,
+                };
+        }
+
+        public static OrderViewModel MapToOrderWithNoItem(Order order)
+        {
+            return order == null
+                ? throw new ArgumentNullException(nameof(order))
+                : new OrderViewModel
+                {
+                    Id = order.Id,
+                    Type = order.Type,
+                    Status = order.Status,
+                    CreatedAt = order.CreatedAt,
+                    UpdatedAt = order.UpdatedAt,
+                };
+        }
     }
-    public class OrderDetail
+
+    public class OrderDetailViewModel
     {
         public required string Id { get; set; }
         public OrderType Type { get; set; }
@@ -20,10 +51,39 @@ namespace backend.ViewModels
         public decimal Total { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public required List<OrderItemDetail> Items { get; set; }
+        public required List<OrderItemDetailViewModel> Items { get; set; }
+
+        public static OrderDetailViewModel MapToOrderDetail(Order order)
+        {
+            return order == null || order.OrderItems == null || order.OrderItems.Count == 0
+                ? throw new ArgumentNullException(nameof(order))
+                : new OrderDetailViewModel
+            {
+                Id = order.Id,
+                Type = order.Type,
+                Status = order.Status,
+                Total = order.OrderItems.Sum(item => item.Item.Price * item.Quantity),
+                CreatedAt = order.CreatedAt,
+                UpdatedAt = order.UpdatedAt,
+                Items = [.. order.OrderItems
+                    .Select(item => new OrderItemDetailViewModel
+                    {
+                        Id = item.ItemId,
+                        Name = item.Item.Name,
+                        Quantity = item.Quantity,
+                        Price = item.Item.Price
+                    })]
+                };
+        }
     }
 
-    public class OrderItemDetail
+    public class OrderItemViewModel
+    {
+        public required string Id { get; set; } 
+        public decimal Quantity { get; set; }
+    }
+
+    public class OrderItemDetailViewModel
     {
         public required string Id { get; set; }
         public required string Name { get; set; }
@@ -31,34 +91,21 @@ namespace backend.ViewModels
         public decimal Quantity { get; set; }
     }
 
-    public class AddOrderDto
+    public class AddOrderViewModel
     {
         public required OrderType Type { get; set; }
-        public required List<OrderItemDto> Items { get; set; }
+        public required List<OrderItemViewModel> OrderItems { get; set; }
     }
 
-    public class OrderItemDto
-    {
-        public required string Id { get; set; } 
-        public decimal Quantity { get; set; }
-    }
-
-    public class UpdateOrderStatus
+    public class UpdateOrderStatusViewModel
     {
         public required string Id { get; set; }
         public OrderStatus Status { get; set; }
     }
 
-    public class UpdateMultipleOrderItemsDto
+    public class UpdateOrderItemsViewModel
     {
         public required string OrderId { get; set; }
-        public required List<OrderItemUpdateDto> Items { get; set; }
-    }
-
-    public class OrderItemUpdateDto
-    {
-        public required string OldItemId { get; set; }
-        public required string NewItemId { get; set; }
-        public decimal Quantity { get; set; }
+        public required List<OrderItemViewModel> Items { get; set; }
     }
 }

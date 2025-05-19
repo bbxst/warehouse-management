@@ -3,6 +3,7 @@ using backend.Interfaces;
 using backend.Models;
 using backend.ViewModels;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 namespace backend.Services
 {
@@ -11,7 +12,7 @@ namespace backend.Services
         private readonly AppDbContext context = context;
         private readonly ILogger<OrderService> logger = logger;
 
-        public async Task<IEnumerable<OrderViewModel>> GetOrders(OrderStatus? status, OrderType? type)
+        public async Task<IEnumerable<Order>> GetOrders(OrderStatus? status, OrderType? type)
         {
             var query = context.Orders
                 .Include(o => o.OrderItems)
@@ -28,25 +29,11 @@ namespace backend.Services
                 query = query.Where(o => o.Type == type.Value);
             }
 
-            var orders = await query
-                .Select(order => new OrderViewModel
-                {
-                    Id = order.Id,
-                    Type = order.Type,
-                    Status = order.Status,
-                    ItemCount = order.OrderItems.Count,
-                    Total = order.OrderItems.Sum(item => item.Item!.Price * item.Quantity),
-                    CreatedAt = order.CreatedAt,
-                    UpdatedAt = order.UpdatedAt,
-                })
-                .OrderBy(order => order.Id)
-                .ToListAsync();
-
             logger.LogInformation("Fetched orders");
-            return orders;
+            return await query.OrderBy(order => order.Id).ToListAsync();
         }
 
-        public async Task<OrderDetail?> GetOrder(string id)
+        public async Task<Order> GetOrder(string id)
         {
             try
             {
@@ -56,28 +43,13 @@ namespace backend.Services
                     .FirstOrDefaultAsync(o => o.Id == id) ??
                     throw new KeyNotFoundException($"Order with ID {id} not found.");
 
-                var total = order.OrderItems.Sum(item => item.Item!.Price * item.Quantity);
-
-                var orderViewModel = new OrderDetail
-                {
-                    Id = order.Id,
-                    Type = order.Type,
-                    Status = order.Status,
-                    Total = total,
-                    CreatedAt = order.CreatedAt,
-                    UpdatedAt = order.UpdatedAt,
-                    Items = [.. order.OrderItems.Select(item => new OrderItemDetail
-                    {
-                        Id = item.ItemId,
-                        Name = item.Item!.Name,
-                        Price = item.Item.Price,
-                        Quantity = item.Quantity,
-
-                    })]
-                };
-
                 logger.LogInformation("Fetched details for order {OrderId}", order.Id);
-                return orderViewModel;
+                return order;
+            }
+            catch (KeyNotFoundException ex)
+            {
+                logger.LogWarning("{message}", ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
@@ -86,7 +58,7 @@ namespace backend.Services
             }
         }
 
-        public async Task<string?> AddOrder(AddOrderDto order)
+        public async Task<Order> AddOrder(AddOrderViewModel order)
         {
             using var transaction = await context.Database.BeginTransactionAsync();
 
@@ -108,25 +80,8 @@ namespace backend.Services
                 await context.Orders.AddAsync(newOrder);
                 await context.SaveChangesAsync();
 
-                foreach (var item in order.Items)
+                foreach (var item in order.OrderItems)
                 {
-                    var inventoryItem = await context.Inventory.FirstOrDefaultAsync(i => i.Id == item.Id) ?? 
-                        throw new ArgumentException($"Item with ID {item.Id} not found.");
-
-                    if (order.Type == OrderType.Outgoing)
-                    {
-                        if (inventoryItem.Quantity < item.Quantity)
-                        {
-                            throw new ArgumentException($"Insufficient quantity for item ID {item.Id}. Available: {inventoryItem.Quantity}, Requested: {item.Quantity}");
-                        }
-
-                        inventoryItem.Quantity -= item.Quantity;
-                    } 
-                    else
-                    {
-                        inventoryItem.Quantity += item.Quantity;
-                    }
-
                     var orderItem = new OrderItem
                     {
                         OrderId = orderId,
@@ -135,14 +90,13 @@ namespace backend.Services
                     };
 
                     await context.OrderItems.AddAsync(orderItem);
-                    context.Inventory.Update(inventoryItem);
                 }
 
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 logger.LogInformation("Order {OrderId} created successfully.", orderId);
-                return orderId;
+                return newOrder;
             }
             catch (ArgumentException ex)
             {
@@ -158,50 +112,71 @@ namespace backend.Services
             }
         }
 
-        public async Task<string> UpdateMultipleOrderItems(UpdateMultipleOrderItemsDto updateDto)
+        public async Task<Order> UpdateMultipleOrderItems(UpdateOrderItemsViewModel updateOrderItems)
         {
             using var transaction = await context.Database.BeginTransactionAsync();
+
             try
             {
-                var orderItems = await context.OrderItems
-                    .Where(oi => oi.OrderId == updateDto.OrderId)
-                    .ToListAsync();
+                var exitingOrder = await context.Orders
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Item)
+                    .FirstOrDefaultAsync(o => o.Id == updateOrderItems.OrderId);
 
-                if (orderItems.Count == 0)
+
+                if (exitingOrder == null || exitingOrder!.OrderItems.Count == 0)
                 {
-                    throw new ArgumentException($"No order items found for Order ID {updateDto.OrderId}.");
+                    throw new ArgumentException($"No order items found for Order ID {updateOrderItems.OrderId}.");
                 }
 
-                foreach (var itemDto in updateDto.Items)
+                if (exitingOrder.Status == OrderStatus.Canceled)
                 {
-                    var existingItem = orderItems
-                        .FirstOrDefault(oi => oi.ItemId == itemDto.OldItemId) ?? 
-                        throw new ArgumentException($"Order item with Item ID {itemDto.OldItemId} not found.");
-                    var newItem = await context.Inventory.FindAsync(itemDto.NewItemId) ?? 
-                        throw new ArgumentException($"Item with ID {itemDto.NewItemId} not found.");
-                    existingItem.ItemId = itemDto.NewItemId;
-                    existingItem.Quantity = itemDto.Quantity;
-
-                    context.OrderItems.Update(existingItem);
+                    throw new ArgumentException($"Order {updateOrderItems.OrderId} has been marked as canceled, please place a new order instead.");
                 }
 
-                var order = await context.Orders.FindAsync(updateDto.OrderId);
-                if (order != null)
-                { 
-                    order.UpdatedAt = DateTime.UtcNow;
+                var existingOrderItems = exitingOrder.OrderItems;
+
+                var itemsToRemove = existingOrderItems
+                    .Where(oi => !updateOrderItems.Items.Any(uoi => uoi.Id == oi.ItemId))
+                    .ToList();
+
+                foreach (var itemToRemove in itemsToRemove)
+                {
+                    existingOrderItems.Remove(itemToRemove);
                 }
 
+                foreach (var updateOrderItem in updateOrderItems.Items)
+                {
+                    var existingOrderItem = existingOrderItems.FirstOrDefault(oi => oi.ItemId == updateOrderItem.Id);
+
+                    if (existingOrderItem != null)
+                    {
+                        existingOrderItem.Quantity = updateOrderItem.Quantity;
+                    }
+                    else
+                    {
+                        existingOrderItems.Add(new OrderItem
+                        {
+                            OrderId = exitingOrder.Id,
+                            ItemId = updateOrderItem.Id,
+                            Quantity = updateOrderItem.Quantity
+                        });
+                    }
+                }
+
+                exitingOrder.UpdatedAt = DateTime.UtcNow;
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                logger.LogInformation("Order items updated for Order ID {OrderId}.", updateDto.OrderId);
-                return "Order items updated successfully.";
+                logger.LogInformation("Order items updated for Order ID {OrderId}.", updateOrderItems.OrderId);
+                logger.LogInformation("[Order Detail] : {OrderDetial}", exitingOrder.ToString());
+                return exitingOrder;
             }
             catch (ArgumentException ex)
             {
                 await transaction.RollbackAsync();
                 logger.LogWarning("An error occurred: {ErrorMessage}", ex.Message);
-                return $"Update failed: {ex.Message}";
+                throw;
             }
             catch (Exception ex)
             {
@@ -210,50 +185,82 @@ namespace backend.Services
                 throw new Exception("An error occurred while updating multiple order items.");
             }
         }
-        public async Task<string> UpdateOrder(UpdateOrderStatus orderStatus)
+
+        public async Task<Order> UpdateOrder(UpdateOrderStatusViewModel orderStatus)
         {
+            using var transaction = await context.Database.BeginTransactionAsync();
+
             try
             {
-                var existingOrder = await context.Orders.FindAsync(orderStatus.Id) ??
+                var existingOrder = await context.Orders
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Item)
+                    .FirstOrDefaultAsync(o => o.Id == orderStatus.Id);
+                    
+                if (existingOrder == null || existingOrder.OrderItems.Count == 0)
+                {
                     throw new ArgumentException($"Order {orderStatus.Id} not found.");
+                }
+
+                foreach (var exitingOrderItem in existingOrder.OrderItems)
+                {
+                    var exitingItem = exitingOrderItem.Item ?? throw new ArgumentException($"Item with ID {exitingOrderItem.ItemId} not found.");
+
+                    if (existingOrder.Type == OrderType.Incoming)
+                    {
+                        exitingItem.Quantity += exitingOrderItem.Quantity;
+                    }
+                    else
+                    {
+                        if (exitingItem.Quantity < exitingOrderItem.Quantity)
+                        {
+                            throw new ArgumentException($"Insufficient quantity for item ID {exitingOrderItem.ItemId}. Available: {exitingItem.Quantity}, Requested: {exitingOrderItem.Quantity}");
+                        }
+
+                        exitingItem.Quantity -= exitingOrderItem.Quantity;
+                    }
+                }
 
                 existingOrder.Status = orderStatus.Status;
                 existingOrder.UpdatedAt = DateTime.UtcNow;
                 await context.SaveChangesAsync();
+                await transaction.CommitAsync();
 
                 logger.LogInformation("Update order status for Id: {OrderId} successfully", orderStatus.Id);
-                return "Update order status successfully";
+                return existingOrder;
             }
             catch (ArgumentException ex)
             {
+                await transaction.RollbackAsync();
                 logger.LogWarning("An error occurred: {ErrorMessage}", ex.Message);
-                return $"Update failed: {ex.Message}";
+                throw;
             }
             catch (Exception ex)
             {
+                await transaction.RollbackAsync();
                 logger.LogError(ex, "Error updating order status.");
                 throw new Exception("An error occurred while updating order status.");
             }
         }
 
-        public async Task<string> DeleteOrder(string id)
+        public async Task<Order> DeleteOrder(string id)
         {
             try
             {
                 var existingOrder = await context.Orders.FindAsync(id) ??
-                    throw new ArgumentException($"Order {id} not found.");
+                    throw new KeyNotFoundException($"Order {id} not found.");
 
                 existingOrder.Status = OrderStatus.Canceled;
                 existingOrder.UpdatedAt = DateTime.UtcNow;
                 await context.SaveChangesAsync();
 
                 logger.LogInformation("Cancel order Id: {OrderId} successfully", id);
-                return "Cancel order successfully";
+                return existingOrder;
             }
-            catch (ArgumentException ex)
+            catch (KeyNotFoundException ex)
             {
-                logger.LogWarning("An error occurred: {ErrorMessage}", ex.Message);
-                return $"Cancel failed: {ex.Message}";
+                logger.LogWarning("{Message}", ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
@@ -266,7 +273,7 @@ namespace backend.Services
         {
             var lastOrder = await context.Orders.OrderByDescending(o => o.Id).FirstOrDefaultAsync();
             int nextId = lastOrder != null ? int.Parse(lastOrder.Id[4..]) + 1 : 1;
-            return $"ORD-{nextId:D5}";
+            return $"ORD{nextId:D5}";
         }
     }
 } 
